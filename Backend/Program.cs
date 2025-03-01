@@ -1,4 +1,5 @@
 using Backend.Data;
+using Backend.DTO.EXAPI;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,6 +14,8 @@ builder.Services.AddDbContext<ApplicationDbContext>((sp, o) =>
     o.UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=CodingExercise;Trusted_Connection=True");
 });
 
+builder.Services.AddHttpClient();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -24,29 +27,26 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-var summaries = new[]
+app.MapGet("/api/user/filtered", async (string? gender, string? email, string? username, HttpClient httpClient) =>
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+    var response = await httpClient.GetAsync("https://random-data-api.com/api/users/random_user?size=10");
 
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast")
-.WithOpenApi();
+    var users = await response.Content.ReadFromJsonAsync<List<UserDTO>>();
+
+    foreach (var user in users)
+    {
+        Console.WriteLine($"{user.Username} {user.Uid} {user.Id} {user.Email} {user.Username} {user.FirstName} {user.LastName} {user.ProfilePicUrl} {user.Gender} {user.PhoneNumber} {user.Employment.ToString()} {user.KeySkill} {user.Address.ToString()}");
+    }
+        
+
+    List<string> parameters = new();
+    if (gender is not null)
+        parameters.Add(gender);
+    if (email is not null)
+        parameters.Add(email);
+    if (username is not null)
+        parameters.Add(username);
+});
 
 app.Run();
 
-internal record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
