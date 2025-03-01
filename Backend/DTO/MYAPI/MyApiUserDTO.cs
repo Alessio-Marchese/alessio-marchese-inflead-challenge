@@ -2,7 +2,7 @@
 
 namespace Backend.DTO.MYAPI
 {
-    public class UserDTO
+    public class MyApiUserDTO
     {
         [Key]
         public string Id { get; set; }                  // map from Uid
