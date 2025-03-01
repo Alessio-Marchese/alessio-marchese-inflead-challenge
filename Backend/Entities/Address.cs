@@ -11,16 +11,8 @@ public class Address
 
     public DateTime CreationDate { get; set; }
 
-    protected Address() { }
-
-    public Address(string id, string city, string street, string zipCode, string state)
+    protected Address()
     {
-        Uid = Guid.NewGuid();
-        Id = id;
-        City = city;
-        Street = street;
-        ZipCode = zipCode;
-        State = state;
         CreationDate = DateTime.Now;
     }
 }
