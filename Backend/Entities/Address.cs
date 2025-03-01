@@ -11,9 +11,9 @@ public class Address
 
     public DateTime CreationDate { get; set; }
 
-    public Address(Guid uid, string id, string city, string street, string zipCode, string state)
+    public Address(string id, string city, string street, string zipCode, string state)
     {
-        Uid = uid;
+        Uid = Guid.NewGuid();
         Id = id;
         City = city;
         Street = street;
