@@ -20,7 +20,8 @@ public class UserMapper
             PhoneNumber = user.PhoneNumber,
             Employment = user.Employment,
             KeySkill = user.KeySkill,
-            AddressId = user.Address.Id
+            AddressId = user.Address.Id,
+            CreationDate = user.CreationDate
         };
     }
 
@@ -36,7 +37,8 @@ public class UserMapper
             Gender = user.Gender,
             PhoneNumber = user.PhoneNumber,
             Employment = $"{user.Employment.Title} {user.Employment.KeySkill}",
-            KeySkill = user.Employment.KeySkill
+            KeySkill = user.Employment.KeySkill,
+            CreationDate = DateTime.Now
             //Manca l'id dell'indirizzo
         };
 

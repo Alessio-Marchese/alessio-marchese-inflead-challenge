@@ -123,8 +123,6 @@ app.MapGet("/api/user/filtered", async (string? gender, string? email, string? u
         {
             var filteredExapiUsers = exapiUsers.Where(u => u.Gender.Equals(gender)).ToList();
 
-            
-
             foreach (var filteredExapiUser in filteredExapiUsers)
             {
                 mappedMyApiUsers.Add(UserMapper.ExapiToMyApiDTO(filteredExapiUser));
