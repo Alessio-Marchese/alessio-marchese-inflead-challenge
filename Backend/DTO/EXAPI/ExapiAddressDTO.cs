@@ -1,6 +1,6 @@
 ﻿namespace Backend.DTO.EXAPI;
 
-public class AddressDTO
+public class ExapiAddressDTO
 {
     public string City { get; set; }
     public string Street { get; set; }
