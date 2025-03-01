@@ -15,6 +15,7 @@ public class User
     public Address Address { get; set; }
     public DateTime CreationDate { get; set; }
 
+    protected User() { }
     public User(Guid uid, string id, string email, string username, string fullName, string profilePicUrl, string gender, string phoneNumber, string employment, string keySkill, Address address)
     {
         Uid = uid;
