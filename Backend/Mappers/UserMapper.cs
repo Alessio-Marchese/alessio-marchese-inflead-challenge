@@ -48,6 +48,7 @@ public class UserMapper
         return new User()
         {
             Uid = user.Uid,
+            Id = user.Id,
             Email = user.Email,
             Username = user.Username,
             FullName = $"{user.FirstName} {user.LastName}",
