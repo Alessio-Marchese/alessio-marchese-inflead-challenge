@@ -2,8 +2,7 @@
 using Backend.DTO.MYAPI;
 using Backend.Entities;
 using Backend.ExternalApiClients.Interfaces;
-using Backend.Mappers;
-using Backend.Repository.Interfaces;
+using Backend.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 
@@ -14,14 +13,14 @@ namespace Backend.Controllers;
 public class UserController : ControllerBase
 {
     private readonly IUserExapiClient _userExapiClient;
-    private readonly IUserRepository _userRepo;
-    private readonly IAddressRepository _addressRepo;
+    private readonly IUserService _userService;
+    private readonly IAddressService _addressService;
 
-    public UserController(IUserExapiClient userExapiClient, IUserRepository userRepo, IAddressRepository addressRepo)
+    public UserController(IUserExapiClient userExapiClient, IUserService userService, IAddressService addressService)
     {
         _userExapiClient = userExapiClient;
-        _userRepo = userRepo;
-        _addressRepo = addressRepo;
+        _userService = userService;
+        _addressService = addressService;
     }
 
     [HttpGet("filtered")]
@@ -32,7 +31,7 @@ public class UserController : ControllerBase
         //Questo é possibile con EMAIL e USERNAME che sono parametri univoci
         bool isSingleResult = false;
 
-        var dbUsers = await _userRepo.GetAllUsersWithAddressesAsync();
+        var dbUsers = await _userService.GetAllUsersWithAddressesAsync();
 
         //Costruiamo la query per filtrare i dati presenti nel DB
         IQueryable<User> query = dbUsers.AsQueryable();
@@ -59,7 +58,7 @@ public class UserController : ControllerBase
             //Se la query torna una lista non vuota significa che ha trovato il dato che cerchiamo
             if (!users.IsNullOrEmpty())
             {
-                return Ok(UserMapper.DbToMyApiDTO(users[0]));
+                return Ok(_userService.DbToMyApiDTO(users[0]));
             }
             else
             {
@@ -90,16 +89,13 @@ public class UserController : ControllerBase
                     return NotFound();
                 }
 
-                //Mappiamo l'utente da Exapi a Db
-                var mappedDbUser = UserMapper.ExapiToDb(filteredExapiUser);
-
                 //Salviamo l'indirizzo e l'utente nel nostro db locale
-                await _addressRepo.CreateAddressAsync(mappedDbUser.Address);
-                await _userRepo.CreateUserAsync(mappedDbUser);
+                var addressId = await _addressService.CreateAddressAsync(filteredExapiUser.Address);
+                await _userService.CreateUserAsync(filteredExapiUser, addressId);
 
                 //Mappiamo da exapi a myApi per mostrato il risultato nel form che ci é stato chiesto
-                var mappedMyApiUser = UserMapper.ExapiToMyApiDTO(filteredExapiUser);
-                mappedMyApiUser.AddressId = mappedDbUser.Address.Id.ToString();
+                var mappedMyApiUser = _userService.ExapiToMyApiDTO(filteredExapiUser);
+                mappedMyApiUser.AddressId = addressId.ToString();
                 return Ok(mappedMyApiUser);
             }
         }
@@ -124,17 +120,15 @@ public class UserController : ControllerBase
                 {
                     continue;
                 }
-                //Converte ogni exapiUser in exapiUsers
-                var dbUser = UserMapper.ExapiToDb(exapiUser);
 
                 //Lo salva nel DB
-                await _addressRepo.CreateAddressAsync(dbUser.Address);
-                await _userRepo.CreateUserAsync(dbUser);
+                int addressId = await _addressService.CreateAddressAsync(exapiUser.Address);
+                await _userService.CreateUserAsync(exapiUser, addressId);
 
                 //Converte da exapiUser in myApiUser
-                var mappedMyApiUser = UserMapper.ExapiToMyApiDTO(exapiUser);
+                var mappedMyApiUser = _userService.ExapiToMyApiDTO(exapiUser);
                 mappedMyApiUsers.Add(mappedMyApiUser);
-                mappedMyApiUser.AddressId = dbUser.Address.Id.ToString();
+                mappedMyApiUser.AddressId = addressId.ToString();
             }
 
             //L'unico filtro che possiamo aspettarci é quello del gender, quindi controliamo se é presente ed eventualmente lo eseguiamo
