@@ -7,9 +7,9 @@ namespace Backend.Repository.Implements;
 public class AddressRepository(ApplicationDbContext dbContext) : IAddressRepository
 {
     //CREATE
-    public void CreateAddress(Address address)
+    public async Task CreateAddressAsync(Address address)
     {
-        dbContext.Addresses.Add(address);
-        dbContext.SaveChanges();
+        await dbContext.Addresses.AddAsync(address);
+        await dbContext.SaveChangesAsync();
     }
 }

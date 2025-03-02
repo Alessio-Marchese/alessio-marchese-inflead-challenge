@@ -1,14 +1,13 @@
 ﻿using Backend.Entities;
-using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Repository.Interfaces;
 
 public interface IUserRepository
 {
     //CREATE
-    public void CreateUser(User user);
+    public Task CreateUserAsync(User user);
     //READ
-    public List<User> GetAllUsers();
+    public Task<List<User>> GetAllUsersAsync();
 
-    public List<User> GetAllUsersWithAddresses();
+    public Task<List<User>> GetAllUsersWithAddressesAsync();
 }

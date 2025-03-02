@@ -8,19 +8,19 @@ namespace Backend.Repository.Implements;
 public class UserRepository(ApplicationDbContext dbContext) : IUserRepository
 {
     //CREATE
-    public void CreateUser(User user)
+    public async Task CreateUserAsync(User user)
     {
-        dbContext.Users.Add(user);
-        dbContext.SaveChanges();
+        await dbContext.Users.AddAsync(user);
+        await dbContext.SaveChangesAsync();
     }
     //READ
-    public List<User> GetAllUsers()
+    public async Task<List<User>> GetAllUsersAsync()
     {
-        return dbContext.Users.ToList();
+        return await dbContext.Users.ToListAsync();
     }
 
-    public List<User> GetAllUsersWithAddresses()
+    public async Task<List<User>> GetAllUsersWithAddressesAsync()
     {
-        return dbContext.Users.Include(u => u.Address).ToList();
+        return await dbContext.Users.Include(u => u.Address).ToListAsync();
     }
 }

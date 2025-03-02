@@ -5,5 +5,5 @@ namespace Backend.Repository.Interfaces;
 public interface IAddressRepository
 {
     //CREATE
-    public void CreateAddress(Address address);
+    public Task CreateAddressAsync(Address address);
 }

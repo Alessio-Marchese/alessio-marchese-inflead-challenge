@@ -1,7 +1,6 @@
 ﻿using Backend.DTO.EXAPI;
 using Backend.DTO.MYAPI;
 using Backend.Entities;
-using Backend.ExternalApiClients.Implements;
 using Backend.ExternalApiClients.Interfaces;
 using Backend.Mappers;
 using Backend.Repository.Interfaces;
@@ -33,8 +32,10 @@ public class UserController : ControllerBase
         //Questo é possibile con EMAIL e USERNAME che sono parametri univoci
         bool isSingleResult = false;
 
+        var dbUsers = await _userRepo.GetAllUsersWithAddressesAsync();
+
         //Costruiamo la query per filtrare i dati presenti nel DB
-        IQueryable<User> query = _userRepo.GetAllUsersWithAddresses().AsQueryable();
+        IQueryable<User> query = dbUsers.AsQueryable();
 
         //La chiamata all'endpoint dará in output un singolo risultato solo quando nella query di filtraggio é presente l'email o la password
         //mentre invece se si filtra per gender o si invia la chiamata senza filtri questa dará in output piú risultati e quindi isSingleResult rimarrá 'false'
@@ -93,8 +94,8 @@ public class UserController : ControllerBase
                 var mappedDbUser = UserMapper.ExapiToDb(filteredExapiUser);
 
                 //Salviamo l'indirizzo e l'utente nel nostro db locale
-                _addressRepo.CreateAddress(mappedDbUser.Address);
-                _userRepo.CreateUser(mappedDbUser);
+                await _addressRepo.CreateAddressAsync(mappedDbUser.Address);
+                await _userRepo.CreateUserAsync(mappedDbUser);
 
                 //Mappiamo da exapi a myApi per mostrato il risultato nel form che ci é stato chiesto
                 var mappedMyApiUser = UserMapper.ExapiToMyApiDTO(filteredExapiUser);
@@ -116,8 +117,6 @@ public class UserController : ControllerBase
 
             List<MyApiUserDTO> mappedMyApiUsers = [];
 
-            var dbUsers = _userRepo.GetAllUsers();
-
             foreach (var exapiUser in exapiUsers)
             {
                 //Prima di procedere con il salvataggio controlla che questo utente non esista giá nel DB locale
@@ -129,8 +128,8 @@ public class UserController : ControllerBase
                 var dbUser = UserMapper.ExapiToDb(exapiUser);
 
                 //Lo salva nel DB
-                _addressRepo.CreateAddress(dbUser.Address);
-                _userRepo.CreateUser(dbUser);
+                await _addressRepo.CreateAddressAsync(dbUser.Address);
+                await _userRepo.CreateUserAsync(dbUser);
 
                 //Converte da exapiUser in myApiUser
                 var mappedMyApiUser = UserMapper.ExapiToMyApiDTO(exapiUser);
