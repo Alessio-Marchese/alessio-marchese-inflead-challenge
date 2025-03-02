@@ -17,6 +17,7 @@ public class User
     public string PhoneNumber { get; set; }
     public string Employment { get; set; }
     public string KeySkill { get; set; }
+    public int AddressId { get; set; }
     public Address Address { get; set; }
     public DateTime CreationDate { get; set; }
 

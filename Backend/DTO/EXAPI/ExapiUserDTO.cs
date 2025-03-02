@@ -19,5 +19,6 @@ public class ExapiUserDTO
     public string PhoneNumber { get; set; }
     public ExapiEmploymentDTO Employment { get; set; }
     public string KeySkill { get; set; }
+    public int AddressId { get; set; }
     public ExapiAddressDTO Address { get; set; }
 }

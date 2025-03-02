@@ -1,6 +1,5 @@
 ﻿using Backend.DTO.EXAPI;
 using Backend.ExternalApiClients.Interfaces;
-using Microsoft.AspNetCore.Mvc;
 
 namespace Backend.ExternalApiClients.Implements;
 
