@@ -1,12 +1,13 @@
 ﻿using Backend.DTO.EXAPI;
 using Backend.DTO.MYAPI;
 using Backend.Entities;
+using Backend.Mappers.Interfaces;
 
-namespace Backend.Mappers;
+namespace Backend.Mappers.Implements;
 
-public class UserMapper
+public class UserMapper : IUserMapper
 {
-    public static MyApiUserDTO DbToMyApiDTO(User user)
+    public MyApiUserDTO DbToMyApiDTO(User user)
     {
         return new MyApiUserDTO()
         {
@@ -24,7 +25,7 @@ public class UserMapper
         };
     }
 
-    public static MyApiUserDTO ExapiToMyApiDTO(ExapiUserDTO user)
+    public MyApiUserDTO ExapiToMyApiDTO(ExapiUserDTO user)
     {
         return new MyApiUserDTO()
         {
@@ -42,7 +43,7 @@ public class UserMapper
 
     }
 
-    public static User ExapiToDb(ExapiUserDTO user)
+    public User ExapiToDb(ExapiUserDTO user)
     {
         return new User()
         {
@@ -56,13 +57,7 @@ public class UserMapper
             PhoneNumber = user.PhoneNumber,
             Employment = $"{user.Employment.Title} {user.Employment.KeySkill}",
             KeySkill = user.Employment.KeySkill,
-            Address = new Address()
-            {
-                City = user.Address.City,
-                Street = $"{user.Address.StreetName} {user.Address.StreetAddress}",
-                ZipCode = user.Address.ZipCode,
-                State = user.Address.State
-            }
+            AddressId = user.AddressId
         };
 
     }

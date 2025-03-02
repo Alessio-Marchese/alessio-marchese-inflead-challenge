@@ -1,8 +1,12 @@
 using Backend.Data;
 using Backend.ExternalApiClients.Implements;
 using Backend.ExternalApiClients.Interfaces;
+using Backend.Mappers.Implements;
+using Backend.Mappers.Interfaces;
 using Backend.Repository.Implements;
 using Backend.Repository.Interfaces;
+using Backend.Services.Implements;
+using Backend.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,9 +25,16 @@ builder.Services.AddHttpClient();
 
 builder.Services.AddControllers();
 
+builder.Services.AddSingleton<IUserMapper, UserMapper>();
+builder.Services.AddSingleton<IAddressMapper, AddressMapper>();
+
 //Scoped per evitare errori di concorrenza quando si accede ai dati simultaneamente
+
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IAddressRepository, AddressRepository>();
+
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IAddressService, AddressService>();
 
 builder.Services.AddScoped<IUserExapiClient, UserExapiClient>();
 
