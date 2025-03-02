@@ -1,5 +1,4 @@
-﻿using Azure.Identity;
-using Backend.DTO.EXAPI;
+﻿using Backend.DTO.EXAPI;
 using Backend.DTO.MYAPI;
 using Backend.Entities;
 

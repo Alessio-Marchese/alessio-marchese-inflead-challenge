@@ -134,9 +134,15 @@ app.MapGet("/api/user/filtered", async (string? gender, string? email, string? u
 
         List<MyApiUserDTO> mappedMyApiUsers = [];
 
+        var dbUsers = dbContext.Users.ToList();
 
         foreach (var exapiUser in exapiUsers)
         {
+            //Prima di procedere con il salvataggio controlla che questo utente non esista giá nel DB locale
+            if(dbUsers.Any(u => u.Id == exapiUser.Id))
+            {
+                continue;
+            }
             //Converte ogni exapiUser in exapiUsers
             var dbUser = UserMapper.ExapiToDb(exapiUser);
 
