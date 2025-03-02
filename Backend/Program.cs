@@ -39,18 +39,18 @@ app.MapGet("/api/user/filtered", async (string? gender, string? email, string? u
 
     bool isSingleResult = false;
 
-    IQueryable<User> query = dbContext.Users.AsQueryable();
+    IQueryable<User> query = dbContext.Users.Include(u => u.Address).AsQueryable();
 
     if (!String.IsNullOrEmpty(gender))
-        query.Where(u => u.Gender.Equals(gender));
+        query = query.Where(u => u.Gender.Equals(gender));
     if (!String.IsNullOrEmpty(email))
     {
-        query.Where(u => u.Email.Equals(email));
+        query = query.Where(u => u.Email.Equals(email));
         isSingleResult = true;
     }   
     if (!String.IsNullOrEmpty(username))
     {
-        query.Where(u => u.Username.Equals(username));
+        query = query.Where(u => u.Username.Equals(username));
         isSingleResult = true;
     }
         
@@ -77,28 +77,38 @@ app.MapGet("/api/user/filtered", async (string? gender, string? email, string? u
             IQueryable<ExapiUserDTO> queryForExapiList = exapiUsers.AsQueryable();
 
             if (!String.IsNullOrEmpty(email))
-                query.Where(u => u.Email.Equals(email));
+                queryForExapiList = queryForExapiList.Where(u => u.Email.Equals(email));
             if (!String.IsNullOrEmpty(username))
-                query.Where(u => u.Username.Equals(username));
+                queryForExapiList = queryForExapiList.Where(u => u.Username.Equals(username));
 
-            var filteredUser = queryForExapiList.ToList()[0];
+            var filteredUser = queryForExapiList.ToList().IsNullOrEmpty() ? null : queryForExapiList.ToList()[0];
 
+            if(filteredUser is null)
+            {
+                return Results.NotFound();
+            }
+            
             var mappedDbUser = UserMapper.ExapiToDb(filteredUser);
 
             var dbUsers = dbContext.Users.ToList();
 
-            if(!dbUsers.IsNullOrEmpty())
+            var address = new Address()
             {
-                var lastUser = dbUsers.OrderBy(u => u.Id).Last();
-                mappedDbUser.Id = lastUser.Id++;    
-            }
-            else
-            {
-                mappedDbUser.Id = 1;
-            }
-            dbContext.Users.Add(mappedDbUser);
+                City = mappedDbUser.Address.City,
+                Street = mappedDbUser.Address.Street,
+                ZipCode = mappedDbUser.Address.ZipCode,
+                State = mappedDbUser.Address.State
+            };
+            var dbAddresses = dbContext.Addresses.ToList();
 
-            return Results.Ok(UserMapper.ExapiToMyApiDTO(filteredUser));
+            dbContext.Addresses.Add(address);
+            mappedDbUser.Address = address;
+            dbContext.Users.Add(mappedDbUser);
+            dbContext.SaveChanges();
+
+            var myApiUser = UserMapper.ExapiToMyApiDTO(filteredUser);
+            myApiUser.AddressId = address.Id.ToString();
+            return Results.Ok(myApiUser);
         }
     }
     else
@@ -112,32 +122,41 @@ app.MapGet("/api/user/filtered", async (string? gender, string? email, string? u
 
         var exapiUsers = await response.Content.ReadFromJsonAsync<List<ExapiUserDTO>>();
 
-        if (exapiUsers is null)
+        if (exapiUsers.IsNullOrEmpty() || exapiUsers is null)
         {
             return Results.NotFound();
         }
 
         List<MyApiUserDTO> mappedMyApiUsers = [];
 
+        foreach (var exapiUser in exapiUsers)
+        {
+            var dbUser = UserMapper.ExapiToDb(exapiUser);
+            var address = new Address()
+            {
+                City = exapiUser.Address.City,
+                Street = $"{exapiUser.Address.StreetName} {exapiUser.Address.StreetAddress}",
+                ZipCode = exapiUser.Address.ZipCode,
+                State = exapiUser.Address.State
+            };
+            var dbAddresses = dbContext.Addresses.ToList();
+
+            dbContext.Addresses.Add(address);
+            dbUser.Address = address;
+            dbContext.Users.Add(dbUser);
+            dbContext.SaveChanges();
+            var mappedMyApiUser = UserMapper.DbToMyApiDTO(dbUser);
+            mappedMyApiUsers.Add(mappedMyApiUser);
+            mappedMyApiUser.AddressId = address.Id.ToString();
+        }
+
+        
+
         if (!String.IsNullOrEmpty(gender))
         {
-            var filteredExapiUsers = exapiUsers.Where(u => u.Gender.Equals(gender)).ToList();
-
-            foreach (var filteredExapiUser in filteredExapiUsers)
-            {
-                mappedMyApiUsers.Add(UserMapper.ExapiToMyApiDTO(filteredExapiUser));
-            }
-
-            return Results.Ok(mappedMyApiUsers);
+            return Results.Ok(mappedMyApiUsers.Where(u => u.Gender.Equals(gender)));
         }
-        else
-        {
-            foreach(var exapiUser in exapiUsers)
-            {
-                mappedMyApiUsers.Add(UserMapper.ExapiToMyApiDTO(exapiUser));
-            }
-            return Results.Ok(mappedMyApiUsers);
-        }
+        return Results.Ok(mappedMyApiUsers);
     }
 });
 
