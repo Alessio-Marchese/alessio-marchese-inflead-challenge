@@ -3,6 +3,9 @@ using Backend.DTO.EXAPI;
 using Backend.DTO.MYAPI;
 using Backend.Entities;
 using Backend.Mappers;
+using Backend.Repository;
+using Backend.Repository.Implement;
+using Backend.Repository.Interface;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
@@ -20,6 +23,10 @@ builder.Services.AddDbContext<ApplicationDbContext>((sp, o) =>
 
 builder.Services.AddHttpClient();
 
+//Scoped per evitare errori di concorrenza quando si accede ai dati simultaneamente
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IAddressRepository, AddressRepository>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -31,7 +38,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.MapGet("/api/user/filtered", async (string? gender, string? email, string? username, HttpClient httpClient, ApplicationDbContext dbContext) =>
+app.MapGet("/api/user/filtered", async (string? gender, string? email, string? username, HttpClient httpClient, IUserRepository userRepo, IAddressRepository addressRepo) =>
 {
     //Se la query di ricerca si aspetta piú risultati non possiamo risparmiarci la chiamata all'EXAPI, dato che corriamo il rischio di non mostrare tutti i dati
     //Mentre invece se la query si aspetta un risultato preciso possiamo fare una ricerca nel DB locale per vedere se é giá presente e tentare di risparmiare la chiamata all'EXAPI
@@ -39,7 +46,7 @@ app.MapGet("/api/user/filtered", async (string? gender, string? email, string? u
     bool isSingleResult = false;
 
     //Costruiamo la query per filtrare i dati presenti nel DB
-    IQueryable<User> query = dbContext.Users.Include(u => u.Address).AsQueryable();
+    IQueryable<User> query = userRepo.GetAllUsersWithAddresses().AsQueryable();
 
     //La chiamata all'endpoint dará in output un singolo risultato solo quando nella query di filtraggio é presente l'email o la password
     //mentre invece se si filtra per gender o si invia la chiamata senza filtri questa dará in output piú risultati e quindi isSingleResult rimarrá 'false'
@@ -100,9 +107,8 @@ app.MapGet("/api/user/filtered", async (string? gender, string? email, string? u
             var mappedDbUser = UserMapper.ExapiToDb(filteredExapiUser);
 
             //Salviamo l'indirizzo e l'utente nel nostro db locale
-            dbContext.Addresses.Add(mappedDbUser.Address);
-            dbContext.Users.Add(mappedDbUser);
-            dbContext.SaveChanges();
+            addressRepo.CreateAddress(mappedDbUser.Address);
+            userRepo.CreateUser(mappedDbUser);
 
             //Mappiamo da exapi a myApi per mostrato il risultato nel form che ci é stato chiesto
             var mappedMyApiUser = UserMapper.ExapiToMyApiDTO(filteredExapiUser);
@@ -134,7 +140,7 @@ app.MapGet("/api/user/filtered", async (string? gender, string? email, string? u
 
         List<MyApiUserDTO> mappedMyApiUsers = [];
 
-        var dbUsers = dbContext.Users.ToList();
+        var dbUsers = userRepo.GetAllUsers();
 
         foreach (var exapiUser in exapiUsers)
         {
@@ -147,9 +153,8 @@ app.MapGet("/api/user/filtered", async (string? gender, string? email, string? u
             var dbUser = UserMapper.ExapiToDb(exapiUser);
 
             //Lo salva nel DB
-            dbContext.Addresses.Add(dbUser.Address);
-            dbContext.Users.Add(dbUser);
-            dbContext.SaveChanges();
+            addressRepo.CreateAddress(dbUser.Address);
+            userRepo.CreateUser(dbUser);
 
             //Converte da exapiUser in myApiUser
             var mappedMyApiUser = UserMapper.ExapiToMyApiDTO(exapiUser);
