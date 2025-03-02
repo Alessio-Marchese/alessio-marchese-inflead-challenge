@@ -1,7 +1,8 @@
 using Backend.Data;
-using Backend.Repository;
-using Backend.Repository.Implement;
-using Backend.Repository.Interface;
+using Backend.ExternalApiClients.Implements;
+using Backend.ExternalApiClients.Interfaces;
+using Backend.Repository.Implements;
+using Backend.Repository.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,6 +24,8 @@ builder.Services.AddControllers();
 //Scoped per evitare errori di concorrenza quando si accede ai dati simultaneamente
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IAddressRepository, AddressRepository>();
+
+builder.Services.AddScoped<IUserExapiClient, UserExapiClient>();
 
 var app = builder.Build();
 

@@ -1,8 +1,8 @@
 ﻿using Backend.Data;
 using Backend.Entities;
-using Backend.Repository.Interface;
+using Backend.Repository.Interfaces;
 
-namespace Backend.Repository;
+namespace Backend.Repository.Implements;
 
 public class AddressRepository(ApplicationDbContext dbContext) : IAddressRepository
 {

@@ -1,9 +1,9 @@
 ﻿using Backend.Data;
 using Backend.Entities;
-using Backend.Repository.Interface;
+using Backend.Repository.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
-namespace Backend.Repository.Implement;
+namespace Backend.Repository.Implements;
 
 public class UserRepository(ApplicationDbContext dbContext) : IUserRepository
 {

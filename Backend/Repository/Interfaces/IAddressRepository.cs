@@ -1,7 +1,6 @@
 ﻿using Backend.Entities;
-using Microsoft.EntityFrameworkCore;
 
-namespace Backend.Repository.Interface;
+namespace Backend.Repository.Interfaces;
 
 public interface IAddressRepository
 {

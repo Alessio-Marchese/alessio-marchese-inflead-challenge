@@ -1,8 +1,10 @@
 ﻿using Backend.DTO.EXAPI;
 using Backend.DTO.MYAPI;
 using Backend.Entities;
+using Backend.ExternalApiClients.Implements;
+using Backend.ExternalApiClients.Interfaces;
 using Backend.Mappers;
-using Backend.Repository.Interface;
+using Backend.Repository.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 
@@ -12,13 +14,13 @@ namespace Backend.Controllers;
 [Route("api/[controller]")]
 public class UserController : ControllerBase
 {
-    private readonly HttpClient _httpClient;
+    private readonly IUserExapiClient _userExapiClient;
     private readonly IUserRepository _userRepo;
     private readonly IAddressRepository _addressRepo;
 
-    public UserController(HttpClient httpClient, IUserRepository userRepo, IAddressRepository addressRepo)
+    public UserController(IUserExapiClient userExapiClient, IUserRepository userRepo, IAddressRepository addressRepo)
     {
-        _httpClient = httpClient;
+        _userExapiClient = userExapiClient;
         _userRepo = userRepo;
         _addressRepo = addressRepo;
     }
@@ -61,9 +63,7 @@ public class UserController : ControllerBase
             else
             {
                 //Altrimenti (se l'utente non é presente nel DB dobbiamo recuperarlo dall'EXAPI)
-                var response = await _httpClient.GetAsync("https://random-data-api.com/api/users/random_user?size=10");
-
-                var exapiUsers = await response.Content.ReadFromJsonAsync<List<ExapiUserDTO>>();
+                var exapiUsers = _userExapiClient.GetPaginatedUsers(10).Result;
 
                 if (exapiUsers is null)
                 {
@@ -106,17 +106,7 @@ public class UserController : ControllerBase
         {
             //Altrimenti (se non si tratta di un risultato singolo)
 
-            //Inviamo direttamente la chiamata all'exapi
-            var response = await _httpClient.GetAsync("https://random-data-api.com/api/users/random_user?size=10");
-
-            //Ho notato che alcune volte ricevo una risposta con content type diverso da JSON, ho pensato di anticipare l'errore che darebbe la riga 126 ritornando un codice di errore
-            if (response.Content.Headers.ContentType == null || response.Content.Headers.ContentType.MediaType == null || !response.Content.Headers.ContentType.MediaType.Equals("application/json"))
-            {
-                return UnprocessableEntity();
-            }
-
-            //Converto il JSON in exapiUsers
-            var exapiUsers = await response.Content.ReadFromJsonAsync<List<ExapiUserDTO>>();
+            var exapiUsers = _userExapiClient.GetPaginatedUsers(10).Result;
 
             //Se non riceviamo dati ritorna not found
             if (exapiUsers.IsNullOrEmpty() || exapiUsers is null)
