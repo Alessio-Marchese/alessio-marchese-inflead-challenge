@@ -34,13 +34,15 @@ app.UseHttpsRedirection();
 app.MapGet("/api/user/filtered", async (string? gender, string? email, string? username, HttpClient httpClient, ApplicationDbContext dbContext) =>
 {
     //Se la query di ricerca si aspetta piú risultati non possiamo risparmiarci la chiamata all'EXAPI, dato che corriamo il rischio di non mostrare tutti i dati
-    //Mentre invece se la query si aspetta un solo risultato possiamo fare una ricerca nel DB locale per vedere se é giá presente e tentare di risparmiare la chiamata all'EXAPI
+    //Mentre invece se la query si aspetta un risultato preciso possiamo fare una ricerca nel DB locale per vedere se é giá presente e tentare di risparmiare la chiamata all'EXAPI
     //Questo é possibile con EMAIL e USERNAME che sono parametri univoci
-
     bool isSingleResult = false;
 
+    //Costruiamo la query per filtrare i dati presenti nel DB
     IQueryable<User> query = dbContext.Users.Include(u => u.Address).AsQueryable();
 
+    //La chiamata all'endpoint dará in output un singolo risultato solo quando nella query di filtraggio é presente l'email o la password
+    //mentre invece se si filtra per gender o si invia la chiamata senza filtri questa dará in output piú risultati e quindi isSingleResult rimarrá 'false'
     if (!String.IsNullOrEmpty(gender))
         query = query.Where(u => u.Gender.Equals(gender));
     if (!String.IsNullOrEmpty(email))
@@ -53,18 +55,19 @@ app.MapGet("/api/user/filtered", async (string? gender, string? email, string? u
         query = query.Where(u => u.Username.Equals(username));
         isSingleResult = true;
     }
-        
 
     if (isSingleResult)
     {
-
+        //Esegue la query e filtra i dati del DB
         List<User> users = query.ToList();
+        //Se la query torna una lista non vuota significa che ha trovato il dato che cerchiamo
         if(!users.IsNullOrEmpty())
         {
             return Results.Ok(UserMapper.DbToMyApiDTO(users[0]));
         }
         else
         {
+            //Altrimenti (se l'utente non é presente nel DB dobbiamo recuperarlo dall'EXAPI)
             var response = await httpClient.GetAsync("https://random-data-api.com/api/users/random_user?size=10");
 
             var exapiUsers = await response.Content.ReadFromJsonAsync<List<ExapiUserDTO>>();
@@ -74,54 +77,56 @@ app.MapGet("/api/user/filtered", async (string? gender, string? email, string? u
                 return Results.NotFound();
             }
 
+            //Costruiamo la query di filtraggio per la lista di dati che ci arriva dall'EXAPI
             IQueryable<ExapiUserDTO> queryForExapiList = exapiUsers.AsQueryable();
 
+            //Questa volta filtriamo solo email e password o eventualmente entrambi. Possiamo dare per scontato  
+            //che ci possono essere solo questi due filtri dato che ci troviamo nell'if del risultato singolo
             if (!String.IsNullOrEmpty(email))
                 queryForExapiList = queryForExapiList.Where(u => u.Email.Equals(email));
             if (!String.IsNullOrEmpty(username))
                 queryForExapiList = queryForExapiList.Where(u => u.Username.Equals(username));
 
-            var filteredUser = queryForExapiList.ToList().IsNullOrEmpty() ? null : queryForExapiList.ToList()[0];
+            //Prima di lavorare sul risultato controlliamo se questo é null o vuoto.
+            //L'EXAPI ci da 10 utenti random, tra questi potrebbe non esserci il dato che cerchiamo
+            var filteredExapiUser = queryForExapiList.ToList().IsNullOrEmpty() ? null : queryForExapiList.ToList()[0];
 
-            if(filteredUser is null)
+            if(filteredExapiUser is null)
             {
                 return Results.NotFound();
             }
             
-            var mappedDbUser = UserMapper.ExapiToDb(filteredUser);
+            //Mappiamo l'utente da Exapi a Db
+            var mappedDbUser = UserMapper.ExapiToDb(filteredExapiUser);
 
-            var dbUsers = dbContext.Users.ToList();
-
-            var address = new Address()
-            {
-                City = mappedDbUser.Address.City,
-                Street = mappedDbUser.Address.Street,
-                ZipCode = mappedDbUser.Address.ZipCode,
-                State = mappedDbUser.Address.State
-            };
-            var dbAddresses = dbContext.Addresses.ToList();
-
-            dbContext.Addresses.Add(address);
-            mappedDbUser.Address = address;
+            //Salviamo l'indirizzo e l'utente nel nostro db locale
+            dbContext.Addresses.Add(mappedDbUser.Address);
             dbContext.Users.Add(mappedDbUser);
             dbContext.SaveChanges();
 
-            var myApiUser = UserMapper.ExapiToMyApiDTO(filteredUser);
-            myApiUser.AddressId = address.Id.ToString();
-            return Results.Ok(myApiUser);
+            //Mappiamo da exapi a myApi per mostrato il risultato nel form che ci é stato chiesto
+            var mappedMyApiUser = UserMapper.ExapiToMyApiDTO(filteredExapiUser);
+            mappedMyApiUser.AddressId = mappedDbUser.Address.Id.ToString();
+            return Results.Ok(mappedMyApiUser);
         }
     }
     else
     {
+        //Altrimenti (se non si tratta di un risultato singolo)
+
+        //Inviamo direttamente la chiamata all'exapi
         var response = await httpClient.GetAsync("https://random-data-api.com/api/users/random_user?size=10");
 
+        //Ho notato che alcune volte ricevo una risposta con content type diverso da JSON, ho pensato di anticipare l'errore che darebbe la riga 126 ritornando un codice di errore
         if (response.Content.Headers.ContentType == null || response.Content.Headers.ContentType.MediaType == null || !response.Content.Headers.ContentType.MediaType.Equals("application/json"))
         {
             return Results.UnprocessableEntity();
         }
 
+        //Converto il JSON in exapiUsers
         var exapiUsers = await response.Content.ReadFromJsonAsync<List<ExapiUserDTO>>();
 
+        //Se non riceviamo dati ritorna not found
         if (exapiUsers.IsNullOrEmpty() || exapiUsers is null)
         {
             return Results.NotFound();
@@ -129,33 +134,30 @@ app.MapGet("/api/user/filtered", async (string? gender, string? email, string? u
 
         List<MyApiUserDTO> mappedMyApiUsers = [];
 
+
         foreach (var exapiUser in exapiUsers)
         {
+            //Converte ogni exapiUser in exapiUsers
             var dbUser = UserMapper.ExapiToDb(exapiUser);
-            var address = new Address()
-            {
-                City = exapiUser.Address.City,
-                Street = $"{exapiUser.Address.StreetName} {exapiUser.Address.StreetAddress}",
-                ZipCode = exapiUser.Address.ZipCode,
-                State = exapiUser.Address.State
-            };
-            var dbAddresses = dbContext.Addresses.ToList();
 
-            dbContext.Addresses.Add(address);
-            dbUser.Address = address;
+            //Lo salva nel DB
+            dbContext.Addresses.Add(dbUser.Address);
             dbContext.Users.Add(dbUser);
             dbContext.SaveChanges();
-            var mappedMyApiUser = UserMapper.DbToMyApiDTO(dbUser);
+
+            //Converte da exapiUser in myApiUser
+            var mappedMyApiUser = UserMapper.ExapiToMyApiDTO(exapiUser);
             mappedMyApiUsers.Add(mappedMyApiUser);
-            mappedMyApiUser.AddressId = address.Id.ToString();
+            mappedMyApiUser.AddressId = dbUser.Address.Id.ToString();
         }
 
-        
-
+        //L'unico filtro che possiamo aspettarci é quello del gender, quindi controliamo se é presente ed eventualmente lo eseguiamo
         if (!String.IsNullOrEmpty(gender))
         {
             return Results.Ok(mappedMyApiUsers.Where(u => u.Gender.Equals(gender)));
         }
+
+        //Ritorna gli usenti
         return Results.Ok(mappedMyApiUsers);
     }
 });
