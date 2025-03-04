@@ -1,15 +1,13 @@
-﻿using Backend.DTO.EXAPI;
-using Backend.DTO.MYAPI;
+﻿using Backend.DTO.MYAPI;
 using Backend.Entities;
+using Backend.Utility;
 
 namespace Backend.Services.Interfaces;
 
 public interface IUserService
 {
-    public Task CreateUserAsync(ExapiUserDTO user, int addressId);
-    public Task<List<User>> GetAllUsersAsync();
     public Task<List<User>> GetAllUsersWithAddressesAsync();
-    public MyApiUserDTO ExapiToMyApiDTO(ExapiUserDTO user);
-    public MyApiUserDTO DbToMyApiDTO(User user);
-    public User ExapiToDbDTO(ExapiUserDTO user);
+    public bool CheckIfIsSingleResult(string? email, string? username);
+    public Task<Result<MyApiUserDTO>> FindSingleUser(string? gender, string? email, string? username, List<User> dbUsers);
+    public Task<Result<List<MyApiUserDTO>>> FindManyUsers(string? gender, string? email, string? username, List<User> dbUsers);
 }

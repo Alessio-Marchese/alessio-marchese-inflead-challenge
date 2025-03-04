@@ -1,4 +1,5 @@
 using Backend.Data;
+using Backend.Entities;
 using Backend.ExternalApiClients.Implements;
 using Backend.ExternalApiClients.Interfaces;
 using Backend.Mappers.Implements;
@@ -7,6 +8,7 @@ using Backend.Repository.Implements;
 using Backend.Repository.Interfaces;
 using Backend.Services.Implements;
 using Backend.Services.Interfaces;
+using Backend.Utility;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
