@@ -24,15 +24,12 @@ public class UserService : IUserService
         _userMapper = userMapper;
     }
 
-    public async Task<List<User>> GetAllUsersWithAddressesAsync()
-    {
-        return await _userRepository.GetAllUsersWithAddressesAsync();
-    }
-
     public bool CheckIfIsSingleResult(string? email, string? username)
     {
         bool isSingleResult = false;
 
+        //La chiamata all'endpoint dará in output un singolo risultato solo quando nella query di filtraggio é presente l'email o la password
+        //mentre invece se si filtra per gender o si invia la chiamata senza filtri questa dará in output piú risultati e quindi isSingleResult rimarrá 'false'
         if (!String.IsNullOrEmpty(email) || !String.IsNullOrEmpty(username))
         {
             isSingleResult = true;
@@ -41,15 +38,13 @@ public class UserService : IUserService
         return isSingleResult;
     }
 
-    public async Task<Result<MyApiUserDTO>> FindSingleUser(string? gender, string? email, string? username, List<User> dbUsers)
+    public async Task<Result<MyApiUserDTO>> FindSingleUser(string? email, string? username)
     {
+        var dbUsers = _userRepository.GetAllUsersWithAddressesAsync().Result;
+
         //Costruiamo la query per filtrare i dati presenti nel DB
         IQueryable<User> query = dbUsers.AsQueryable();
 
-        //La chiamata all'endpoint dará in output un singolo risultato solo quando nella query di filtraggio é presente l'email o la password
-        //mentre invece se si filtra per gender o si invia la chiamata senza filtri questa dará in output piú risultati e quindi isSingleResult rimarrá 'false'
-        if (!String.IsNullOrEmpty(gender))
-            query = query.Where(u => u.Gender.Equals(gender));
         if (!String.IsNullOrEmpty(email))
             query = query.Where(u => u.Email.Equals(email));
         if (!String.IsNullOrEmpty(username))
@@ -57,58 +52,61 @@ public class UserService : IUserService
 
         //Esegue la query e filtra i dati del DB
         List<User> users = query.ToList();
-            //Se la query torna una lista non vuota significa che ha trovato il dato che cerchiamo
-            if (!users.IsNullOrEmpty())
+        //Se la query torna una lista non vuota significa che ha trovato il dato che cerchiamo
+        if (!users.IsNullOrEmpty())
+        {
+            return Result<MyApiUserDTO>.Success(_userMapper.DbToMyApiDTO(users[0]));
+        }
+        else
+        {
+            //Altrimenti (se l'utente non é presente nel DB dobbiamo recuperarlo dall'EXAPI)
+            var exapiUsers = _userExapiClient.GetPaginatedUsers(10).Result;
+
+            if (!exapiUsers.IsOk)
             {
-                return Result<MyApiUserDTO>.Success(_userMapper.DbToMyApiDTO(users[0]));
+                return Result<MyApiUserDTO>.Failure(exapiUsers.ErrorMessage);
             }
-            else
+
+            //Costruiamo la query di filtraggio per la lista di dati che ci arriva dall'EXAPI
+            IQueryable<ExapiUserDTO> queryForExapiList = exapiUsers.Data.AsQueryable();
+
+            //Questa volta filtriamo solo email e password o eventualmente entrambi. Possiamo dare per scontato  
+            //che ci possono essere solo questi due filtri dato che ci troviamo nell'if del risultato singolo
+            if (!String.IsNullOrEmpty(email))
+                queryForExapiList = queryForExapiList.Where(u => u.Email.Equals(email));
+            if (!String.IsNullOrEmpty(username))
+                queryForExapiList = queryForExapiList.Where(u => u.Username.Equals(username));
+
+            //Prima di lavorare sul risultato controlliamo se questo é null o vuoto.
+            //L'EXAPI ci da 10 utenti random, tra questi potrebbe non esserci il dato che cerchiamo
+            var filteredExapiUser = queryForExapiList.ToList().IsNullOrEmpty() ? null : queryForExapiList.ToList()[0];
+
+            if (filteredExapiUser is null)
             {
-                //Altrimenti (se l'utente non é presente nel DB dobbiamo recuperarlo dall'EXAPI)
-                var exapiUsers = _userExapiClient.GetPaginatedUsers(10).Result;
-
-                if (!exapiUsers.IsOk)
-                {
-                    return Result<MyApiUserDTO>.Failure(exapiUsers.ErrorMessage);
-                }
-
-                //Costruiamo la query di filtraggio per la lista di dati che ci arriva dall'EXAPI
-                IQueryable<ExapiUserDTO> queryForExapiList = exapiUsers.Data.AsQueryable();
-
-                //Questa volta filtriamo solo email e password o eventualmente entrambi. Possiamo dare per scontato  
-                //che ci possono essere solo questi due filtri dato che ci troviamo nell'if del risultato singolo
-                if (!String.IsNullOrEmpty(email))
-                    queryForExapiList = queryForExapiList.Where(u => u.Email.Equals(email));
-                if (!String.IsNullOrEmpty(username))
-                    queryForExapiList = queryForExapiList.Where(u => u.Username.Equals(username));
-
-                //Prima di lavorare sul risultato controlliamo se questo é null o vuoto.
-                //L'EXAPI ci da 10 utenti random, tra questi potrebbe non esserci il dato che cerchiamo
-                var filteredExapiUser = queryForExapiList.ToList().IsNullOrEmpty() ? null : queryForExapiList.ToList()[0];
-
-                if (filteredExapiUser is null)
-                {
-                    return Result<MyApiUserDTO>.Failure("L'utente che stai cercando con i filtri specificati non é presente nell'API esterna");
-                }
-
-                //Salviamo l'indirizzo e l'utente nel nostro db locale
-                var addressId = await _addressService.CreateAddressAsync(filteredExapiUser.Address);
-                filteredExapiUser.AddressId = addressId;
-                await _userRepository.CreateUserAsync(_userMapper.ExapiToDb(filteredExapiUser));
-
-                //Mappiamo da exapi a myApi per mostrato il risultato nel form che ci é stato chiesto
-                var mappedMyApiUser = _userMapper.ExapiToMyApiDTO(filteredExapiUser);
-                mappedMyApiUser.AddressId = addressId.ToString();
-                return Result<MyApiUserDTO>.Success(mappedMyApiUser);
+                return Result<MyApiUserDTO>.Failure("L'utente che stai cercando con i filtri specificati non é presente nel DB e neanche nell'Api esterna");
             }
+
+            //Salviamo l'indirizzo e l'utente nel nostro db locale
+            var addressId = await _addressService.CreateAddressAsync(filteredExapiUser.Address);
+            filteredExapiUser.AddressId = addressId;
+            await _userRepository.CreateUserAsync(_userMapper.ExapiToDb(filteredExapiUser));
+
+            //Mappiamo da exapi a myApi per mostrato il risultato nel form che ci é stato chiesto
+            var mappedMyApiUser = _userMapper.ExapiToMyApiDTO(filteredExapiUser);
+            mappedMyApiUser.AddressId = addressId.ToString();
+            return Result<MyApiUserDTO>.Success(mappedMyApiUser);
+        }
     }
 
-    public async Task<Result<List<MyApiUserDTO>>> FindManyUsers(string? gender, string? email, string? username, List<User> dbUsers)
+    public async Task<Result<List<MyApiUserDTO>>> FindManyUsers(string? gender)
     {
-        //Altrimenti (se non si tratta di un risultato singolo)
-        var resultExapiUsers = _userExapiClient.GetPaginatedUsers(10).Result;
+        var dbUsers = _userRepository.GetAllUsersWithAddressesAsync().Result;
 
-        //Se non riceviamo dati ritorna not found
+        //Questo metodo verrá invocato quando non viene passato nessun filtro o quando si filtra per genere, in entrambi i casi 
+        //non stiamo cercando un dato specifico quindi ecuperiamo gli utenti dall'API esterna
+        Result<List<ExapiUserDTO>> resultExapiUsers = _userExapiClient.GetPaginatedUsers(10).Result;
+
+        //Se non riceviamo dati ritorna un Result con il messaggio di errore
         if (!resultExapiUsers.IsOk)
         {
             return Result<List<MyApiUserDTO>>.Failure(resultExapiUsers.ErrorMessage);
@@ -130,7 +128,7 @@ public class UserService : IUserService
             await _userRepository.CreateUserAsync(_userMapper.ExapiToDb(exapiUser));
 
             //Converte da exapiUser in myApiUser
-            var mappedMyApiUser = _userMapper.ExapiToMyApiDTO(exapiUser);
+            MyApiUserDTO mappedMyApiUser = _userMapper.ExapiToMyApiDTO(exapiUser);
             mappedMyApiUsers.Add(mappedMyApiUser);
             mappedMyApiUser.AddressId = addressId.ToString();
         }
@@ -141,7 +139,7 @@ public class UserService : IUserService
             return Result<List<MyApiUserDTO>>.Success(mappedMyApiUsers.Where(u => u.Gender.Equals(gender)).ToList());
         }
 
-        //Ritorna gli usenti
+        //Ritorna gli utenti
         return Result<List<MyApiUserDTO>>.Success(mappedMyApiUsers);
     }
 }

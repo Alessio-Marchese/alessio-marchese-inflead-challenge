@@ -17,13 +17,11 @@ public class UserController : ControllerBase
     [HttpGet("filtered")]
     public async Task<IActionResult> GetFilteredUsers([FromQuery] string? gender, [FromQuery] string? email, [FromQuery] string? username)
     {
-        var dbUsers = _userService.GetAllUsersWithAddressesAsync().Result;
-
         bool isSingleResult = _userService.CheckIfIsSingleResult(email, username);
 
         if(isSingleResult)
         {
-            var result = await _userService.FindSingleUser(gender, email, username, dbUsers);
+            var result = await _userService.FindSingleUser(email, username);
             if(result.IsOk)
             {
                 return Ok(result.Data);
@@ -35,7 +33,7 @@ public class UserController : ControllerBase
         }
         else
         {
-            var result = await _userService.FindManyUsers(gender, email, username, dbUsers);
+            var result = await _userService.FindManyUsers(gender);
             if(result.IsOk)
             {
                 return Ok(result.Data);
